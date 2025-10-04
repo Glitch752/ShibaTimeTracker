@@ -46,7 +46,7 @@
             margin-left: 10px;
             font-size: 1rem;
             cursor: pointer;
-            background-color: #555;
+            background-color: #333;
             color: white;
             border: none;
             border-radius: 5px;
@@ -196,6 +196,19 @@
             font-size: 0.9em;
             color: #888;
         }
+        .last-updated button {
+            font-size: 0.9em;
+            cursor: pointer;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        .last-updated button:disabled {
+            color: #666;
+            cursor: default;
+        }
     </style>
 </head>
 <body>
@@ -224,12 +237,12 @@
             <span class="title">Hackatime since last log</span>
             <div class="value" id="hackatime-since-last-log">...</div>
             <progress id="progress-since-last-log" value="0" max="100" style="width: 100%;"></progress>
-            <span class="extra warning" title="The latest log has 0 time, so shiba is still likely updating. It was skipped so the numbers here still make sense." id="log-still-updating" style="display: none">Note: latest log is still updating</span>
         </div>
         <div class="panel">
             <span class="title">Since last demo</span>
             <div class="value" id="tracked-since-last-demo">...</div>
             <progress id="progress-tracked-since-last-demo" value="0" max="100" style="width: 100%;"></progress>
+            <span class="extra warning" title="The latest log has 0 time, so shiba is still likely updating. Numbers are based on the time the log was posted." id="log-still-updating" style="display: none">estimate; latest log is still updating</span>
         </div>
         <div class="panel">
             <span class="title">Since last demo + unlogged</span>
@@ -249,7 +262,7 @@
 
     <p class="reloading" id="reloading-shiba">Reloading Shiba data. The Shiba API is slow, so this may take a bit.</p>
     
-    <p class="last-updated" id="last-updated">Last updated: never</p>
+    <p class="last-updated"><button id="refresh">Refresh</button> <span id="last-updated">Last updated: never</span></p>
 
     <div class="settings">
         <p>
@@ -402,7 +415,7 @@
             return `rgb(${r * 100 + 100}, ${g * 100 + 100}, 100)`;
         }
 
-        let hackatimeSecondsUntilLatestLog = 0;
+        let hackatimeSecondsAfterLatestLog = 0;
         let trackedSecondsSinceLastDemo = 0;
         let totalHackatimeSeconds = 0;
         let totalLoggedSeconds = 0;
@@ -410,10 +423,11 @@
         let hackatimeUpdateTime = null;
         let shibaUpdateTime = null;
         
-        /** @param {string} logTime ISO 8601 date string */
-        async function getHackatimeTimeUntil(logTime) {
+        /** @param {string | undefined} start ISO 8601 date string */
+        async function getHackatimeTimeBetween(start, end = undefined) {
             const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration, {
-                end_date: logTime ?? undefined
+                start_date: start ?? undefined,
+                end_date: end ?? undefined
             });
             if(!data) return;
 
@@ -494,6 +508,7 @@
 
         async function updateShiba() {
             document.getElementById('reloading-shiba').style.display = 'block';
+            document.getElementById('refresh').disabled = true;
 
             const data = await getShibaData();
             if(!data) return;
@@ -567,7 +582,10 @@
                 timeEl.className = 'logged-time';
                 timeEl.innerText = formatTime(timeSeconds || 0) + ' logged';
 
-                if(timeSeconds === 0) timeEl.classList.add('warning');
+                if(timeSeconds === 0 && post !== posts[posts.length - 1]) {
+                    timeEl.classList.add('warning');
+                    timeEl.dataset.warning = 'updating';
+                }
                 postEl.appendChild(timeEl);
 
                 postsContainer.appendChild(postEl);
@@ -578,9 +596,12 @@
             document.getElementById('total-logged-time').innerText = formatTime(totalLoggedSeconds);
             
             trackedSecondsSinceLastDemo = 0;
+            let firstWithNonzeroTime = null;
             for(const post of posts) {
                 if(post.postType === "devlog" && post.PlayLink) break;
                 trackedSecondsSinceLastDemo += post.HoursSpent * 60 * 60;
+
+                if(post.HoursSpent > 0 && !firstWithNonzeroTime) firstWithNonzeroTime = post;
             }
 
             // Record tracked time since the latest demo
@@ -588,33 +609,49 @@
             let latestDevlog = null;
             for(const post of posts) {
                 if(post.postType === "devlog") {
-                    if(post.HoursSpent === 0) latestStillUpdating = true;
-                    else {
-                        // Stop at the first demo we find with time logged
-                        latestDevlog = post;
-                        break;
+                    if(post.HoursSpent === 0) {
+                        latestStillUpdating = true;
                     }
+                    
+                    // Stop at the first demo we find with time logged
+                    latestDevlog = post;
+                    break;
                 }
             }
+
+            // Compensate for updating logs by querying hackatime
+            if(firstWithNonzeroTime && firstWithNonzeroTime !== latestDevlog) {
+                const hackatimeSinceFirstNonzero = await getHackatimeTimeBetween(firstWithNonzeroTime.createdAt, latestDevlog.createdAt) || 0;
+                console.log("Adding hackatime since first nonzero log:", hackatimeSinceFirstNonzero);
+                trackedSecondsSinceLastDemo += hackatimeSinceFirstNonzero;
+
+                // Update the latest devlogs' time to show this estimate
+                const warnings = document.querySelectorAll(`.post .logged-time[data-warning="updating"]`);
+                warnings.forEach(warning => {
+                    warning.innerText = formatTime(hackatimeSinceFirstNonzero / warnings.length) + ' estimated';
+                });
+            }
+
             document.getElementById('log-still-updating').style.display = latestStillUpdating ? 'inline' : 'none';
 
             // Get the hackatime time until the latest devlog
             // const latestDevlog = posts.find(p => p.postType === "devlog");
             if(latestDevlog) {
-                hackatimeSecondsUntilLatestLog = await getHackatimeTimeUntil(latestDevlog.createdAt) || 0;
-                console.log("Calculated hackatime until latest log:", hackatimeSecondsUntilLatestLog);
+                hackatimeSecondsAfterLatestLog = await getHackatimeTimeBetween(latestDevlog.createdAt, undefined) || 0;
+                console.log("Calculated hackatime after latest log:", hackatimeSecondsAfterLatestLog);
             } else {
-                hackatimeSecondsUntilLatestLog = 0;
+                hackatimeSecondsAfterLatestLog = 0;
             }
 
             shibaUpdateTime = new Date();
             updateDisplay();
 
             document.getElementById('reloading-shiba').style.display = 'none';
+            document.getElementById('refresh').disabled = false;
         }
 
         function updateDisplay() {
-            const unloggedCodeTime = Math.max(0, totalHackatimeSeconds - hackatimeSecondsUntilLatestLog);
+            const unloggedCodeTime = hackatimeSecondsAfterLatestLog;
             const totalSinceLastDemo = trackedSecondsSinceLastDemo + unloggedCodeTime;
 
             const maxDemo = 10 * 60 * 60;
@@ -636,7 +673,7 @@
 
             const totalDemoProgress = document.getElementById('progress-since-last-demo');
             totalDemoProgress.max = maxDemo;
-            totalDemoProgress.value = Math.min(unloggedCodeTime, maxDemo);
+            totalDemoProgress.value = Math.min(trackedSecondsSinceLastDemo + unloggedCodeTime, maxDemo);
             totalDemoProgress.style.setProperty('--color', timeProgressColor(totalSinceLastDemo, maxDemo));
             
             const expectedTickets = Math.min(5, Math.floor((totalSinceLastDemo) / (2 * 60 * 60)));
@@ -672,6 +709,17 @@
                 }
             }
         }
+
+        document.getElementById('refresh').onclick = async () => {
+            // Clear caches
+            localStorage.removeItem('shiba_cache');
+            for(const key in localStorage) {
+                if(key.startsWith('hackatime_cache_')) localStorage.removeItem(key);
+            }
+
+            await updateShiba();
+            await updateHackatime();
+        };
 
         (async () => {
             await updateShiba();
