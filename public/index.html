@@ -77,6 +77,16 @@
             font-size: 1.1rem;
             margin: 10px;
         }
+        .panel .title.code-time {
+            color: #88c589;
+        }
+        .panel .title.art-time {
+            color: #c88484;
+        }
+        .panel .title.partial-time {
+            color: #bbb;
+        }
+        
         .panel .extra {
             display: block;
             font-size: 0.9em;
@@ -216,15 +226,15 @@
 
     <div class="panel-row">
         <div class="panel">
-            <span class="title">Total hackatime time</span>
+            <span class="title code-time">Total hackatime time</span>
             <div class="value" id="total-hackatime-time">...</div>
         </div>
         <div class="panel">
-            <span class="title">Total artlog time</span>
+            <span class="title art-time">Total artlog time</span>
             <div class="value" id="total-artlog-time">...</div>
         </div>
         <div class="panel">
-            <span class="title">Total logged time</span>
+            <span class="title partial-time">Total logged time</span>
             <div class="value" id="total-logged-time">...</div>
         </div>
         <div class="panel">
@@ -234,12 +244,12 @@
     </div>
     <div class="panel-row">
         <div class="panel">
-            <span class="title">Hackatime since last log</span>
+            <span class="title code-time">Hackatime since last log</span>
             <div class="value" id="hackatime-since-last-log">...</div>
             <progress id="progress-since-last-log" value="0" max="100" style="width: 100%;"></progress>
         </div>
         <div class="panel">
-            <span class="title">Since last demo</span>
+            <span class="title partial-time">Since last demo</span>
             <div class="value" id="tracked-since-last-demo">...</div>
             <progress id="progress-tracked-since-last-demo" value="0" max="100" style="width: 100%;"></progress>
             <span class="extra warning" title="The latest log has 0 time, so shiba is still likely updating. Numbers are based on the time the log was posted." id="log-still-updating" style="display: none">estimate; latest log is still updating</span>
