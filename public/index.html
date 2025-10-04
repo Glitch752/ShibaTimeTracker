@@ -208,7 +208,7 @@
     <div class="panel-row">
         <div class="panel">
             <span class="title">Hackatime since last log</span>
-            <div class="value" id="hackatime-since-last-log">0h 0m</div>
+            <div class="value" id="hackatime-since-last-log">...</div>
             <progress id="progress-since-last-log" value="0" max="100" style="width: 100%;"></progress>
         </div>
         <div class="panel">
@@ -232,7 +232,7 @@
         </div> -->
     </div>
 
-    <p class="reloading" id="reloading-shiba">Reloading shiba data. The Shiba API is slow, so this may take a bit.</p>
+    <p class="reloading" id="reloading-shiba">Reloading Shiba data. The Shiba API is slow, so this may take a bit.</p>
     
     <p class="last-updated" id="last-updated">Last updated: never</p>
 
@@ -625,14 +625,14 @@
                 if(unloggedCodeTime >= 3 * 60 * 60) {
                     console.log('Sending unlogged hackatime notification');
                     new Notification('Shiba Time Tracker', {
-                        body: 'You have 3+ hours of unlogged hackatime! Consider making a devlog post.',
+                        body: 'You have 3+ hours of unlogged hackatime! Consider making a devlog.',
                         icon: 'https://shiba.hackclub.com/favicon.ico'
                     });
                 }
                 if(totalSinceLastDemo >= 10 * 60 * 60) {
                     console.log('Sending since last demo notification');
                     new Notification('Shiba Time Tracker', {
-                        body: 'You have tracked 10+ hours since your last demo! Consider sending out a demo.',
+                        body: 'You have tracked 10+ hours since your last demo! Consider making a demo.',
                         icon: 'https://shiba.hackclub.com/favicon.ico'
                     });
                 }
@@ -643,14 +643,15 @@
             await updateShiba();
             await updateHackatime();
 
+            let i = 0;
             setInterval(() => {
                 updateHackatime();
+                if(i++ % 3 === 0) sendNotifications();
             }, 5 * 60 * 1000);
 
             setInterval(() => {
                 updateShiba();
-                sendNotifications();
-            }, 15 * 60 * 1000);
+            }, 30 * 60 * 1000);
         })()
     </script>
 </body>
