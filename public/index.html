@@ -83,6 +83,9 @@
             margin: 5px 10px;
             color: #ccc;
         }
+        .panel .extra.warning {
+            color: #f90;
+        }
         .panel .value {
             font-size: 2em;
             font-weight: bold;
@@ -156,6 +159,9 @@
             flex-shrink: 0;
             margin-left: 2rem;
         }
+        .post .logged-time.warning {
+            color: #f90;
+        }
         .post .badge.devlog {
             --color: #4b814d;
         }
@@ -218,6 +224,7 @@
             <span class="title">Hackatime since last log</span>
             <div class="value" id="hackatime-since-last-log">...</div>
             <progress id="progress-since-last-log" value="0" max="100" style="width: 100%;"></progress>
+            <span class="extra warning" title="The latest log has 0 time, so shiba is still likely updating. It was skipped so the numbers here still make sense." id="log-still-updating" style="display: none">Note: latest log is still updating</span>
         </div>
         <div class="panel">
             <span class="title">Since last demo</span>
@@ -557,6 +564,8 @@
                 const timeEl = document.createElement('span');
                 timeEl.className = 'logged-time';
                 timeEl.innerText = formatTime(timeSeconds || 0) + ' logged';
+
+                if(timeSeconds === 0) timeEl.classList.add('warning');
                 postEl.appendChild(timeEl);
 
                 postsContainer.appendChild(postEl);
@@ -565,16 +574,30 @@
             // Total artlog and logged time; only depends on shiba data so can be updated here
             document.getElementById('total-artlog-time').innerText = formatTime(totalArtlogSeconds);
             document.getElementById('total-logged-time').innerText = formatTime(totalLoggedSeconds);
-
-            // Record tracked time since the latest demo
+            
             trackedSecondsSinceLastDemo = 0;
             for(const post of posts) {
                 if(post.postType === "devlog" && post.PlayLink) break;
                 trackedSecondsSinceLastDemo += post.HoursSpent * 60 * 60;
             }
 
+            // Record tracked time since the latest demo
+            let latestStillUpdating = false;
+            let latestDevlog = null;
+            for(const post of posts) {
+                if(post.postType === "devlog") {
+                    if(post.HoursSpent === 0) latestStillUpdating = true;
+                    else {
+                        // Stop at the first demo we find with time logged
+                        latestDevlog = post;
+                        break;
+                    }
+                }
+            }
+            document.getElementById('log-still-updating').style.display = latestStillUpdating ? 'inline' : 'none';
+
             // Get the hackatime time until the latest devlog
-            const latestDevlog = posts.find(p => p.postType === "devlog");
+            // const latestDevlog = posts.find(p => p.postType === "devlog");
             if(latestDevlog) {
                 hackatimeSecondsUntilLatestLog = await getHackatimeTimeUntil(latestDevlog.createdAt) || 0;
                 console.log("Calculated hackatime until latest log:", hackatimeSecondsUntilLatestLog);
