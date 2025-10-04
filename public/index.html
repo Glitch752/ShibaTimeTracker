@@ -256,6 +256,7 @@
             Hackatime API key: <span id="api-key"></span>
             <button id="edit-api-key">Change</button>
             <span class="invalid" id="invalid-api-key">Invalid API key</span>
+            <span class="invalid" id="hackatime-down">Hackatime API down :(</span>
         </p>
         <p>
             Hackatime project: <span id="hackatime-project-name"></span>
@@ -373,9 +374,10 @@
                     'Authorization': `Bearer ${apiKey}`
                 }
             }).then(res => res.json()).catch(() => {
-                document.getElementById('invalid-api-key').style.display = 'inline';
+                document.getElementById('hackatime-down').style.display = 'inline';
                 return null;
             });
+            document.getElementById('hackatime-down').style.display = 'none';
 
             // cache so we don't spam hackatime
             if(cacheDuration > 0 && data) localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: now }));
