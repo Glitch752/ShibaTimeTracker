@@ -60,8 +60,8 @@
         .panel-row {
             display: flex;
             justify-content: center;
-            gap: 20px;
-            margin-top: 3rem;
+            gap: 15px;
+            margin-top: 2rem;
         }
 
         .panel {
@@ -106,13 +106,6 @@
             border-radius: 100px;
         }
 
-        .reloading {
-            margin-top: 20px;
-            font-style: italic;
-            color: #888;
-            display: none;
-        }
-
         .posts {
             margin-top: 30px;
             text-align: left;
@@ -123,6 +116,7 @@
             align-items: stretch;
             width: 60vw;
             padding: 10px;
+            gap: 5px;
         }
         .posts::-webkit-scrollbar {
             background-color: #222;
@@ -137,7 +131,6 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             border-radius: 5px;
             padding: 5px 8px;
-            margin-bottom: 10px;
             display: flex;
             flex-direction: row;
         }
@@ -172,6 +165,22 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+        
+
+        .reloading {
+            margin-top: 20px;
+            font-style: italic;
+            color: #888;
+            display: none;
+        }
+        .last-updated {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            margin: 20px;
+            font-size: 0.9em;
+            color: #888;
         }
     </style>
 </head>
@@ -223,7 +232,9 @@
         </div> -->
     </div>
 
-    <p class="reloading" id="reloading-shiba">Reloading shiba data. The API is insanely slow, but there's not much I can do about it.</p>
+    <p class="reloading" id="reloading-shiba">Reloading shiba data. The Shiba API is slow, so this may take a bit.</p>
+    
+    <p class="last-updated" id="last-updated">Last updated: never</p>
 
     <div class="settings">
         <p>
@@ -317,8 +328,8 @@
         };
 
         const apiBase = `https://hackatime.hackclub.com/api/v1/`;
-        async function sendHackatimeRequest(endpoint, cacheDuration = 0) {
-            const cacheKey = `hackatime_cache_${endpoint}`;
+        async function sendHackatimeRequest(endpoint, cacheDuration = 0, params = {}) {
+            const cacheKey = `hackatime_cache_${endpoint}_${Object.keys(params).sort()}`; // Cache based on keys present, not values. Works for all our current uses
             const now = Date.now();
 
             // Check cache
@@ -339,6 +350,9 @@
             }
 
             // Fetch from API
+            const paramsString = new URLSearchParams(params).toString();
+            if(paramsString) endpoint += `?${paramsString}`;
+            
             const data = await fetch(`${apiBase}${endpoint}`, {
                 headers: {
                     'Authorization': `Bearer ${apiKey}`
@@ -360,8 +374,45 @@
             if(hours === 0) return `${minutes}m`;
             return `${hours}h ${minutes}m`;
         }
+        function timeProgressColor(value, max) {
+            // Green when < 50%, interpolate to red as approaching 100%, then red for anything over
+            if(value >= max) return 'rgb(200, 100, 100)';
+            if(value <= max * 0.5) return 'rgb(100, 200, 100)';
+            
+            const ratio = (value - max / 2) / (max / 2);
+            const r = ratio;
+            const g = 1 - ratio;
+            return `rgb(${r * 100 + 100}, ${g * 100 + 100}, 100)`;
+        }
 
+        let hackatimeSecondsUntilLatestLog = 0;
+        let trackedSecondsSinceLastDemo = 0;
         let totalHackatimeSeconds = 0;
+
+        let hackatimeUpdateTime = null;
+        let shibaUpdateTime = null;
+        
+        /** @param {string} logTime ISO 8601 date string */
+        async function getHackatimeTimeUntil(logTime) {
+            const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration, {
+                end_date: logTime ?? undefined
+            });
+            if(!data) return;
+
+            if(data.error) {
+                if(data.error === "User not found") {
+                    document.getElementById('invalid-api-key').style.display = 'inline';
+                } else if(data.error === "found nuthin") {
+                    document.getElementById('invalid-hackatime-project').style.display = 'inline';
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+                return;
+            }
+
+            return data.total_seconds;
+        }
+
         async function updateHackatime() {
             const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration);
             if(!data) return;
@@ -379,10 +430,13 @@
 
             console.log("Hackatime data loaded", data);
 
-            const timeSeconds = data.total_seconds || 0;
-            totalHackatimeSeconds = timeSeconds;
+            totalHackatimeSeconds = data.total_seconds || 0;
+            // Total hackatime time
+            // This only depends on hackatime data so can be updated here
+            document.getElementById('total-hackatime-time').innerText = formatTime(totalHackatimeSeconds);
 
-            document.getElementById('total-hackatime-time').innerText = formatTime(timeSeconds);
+            hackatimeUpdateTime = new Date();
+            updateDisplay();
         }
 
         async function getShibaData() {
@@ -424,20 +478,29 @@
             document.getElementById('reloading-shiba').style.display = 'block';
 
             const data = await getShibaData();
-
             if(!data) return;
+            
+            console.log("Shiba data loaded", data);
+            
             if(data.length === 0) {
                 document.getElementById('invalid-shiba-project').style.display = 'inline';
                 return;
             }
 
-            const posts = data[0].posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const game = data.find(g => g.name === shibaProjectName);
+            if(!game) {
+                document.getElementById('invalid-shiba-project').style.display = 'inline';
+                return;
+            }
+
+            const posts = game.posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
             console.log(posts);
 
             const postsContainer = document.getElementById('posts');
             postsContainer.innerHTML = '';
 
+            // Calculate total artlog time and total logged time
             let totalArtlogSeconds = 0;
             let totalCodeSeconds = 0;
             let totalSeconds = 0;
@@ -490,24 +553,43 @@
                 postsContainer.appendChild(postEl);
             }
 
-
+            // Total artlog and logged time; only depends on shiba data so can be updated here
             document.getElementById('total-artlog-time').innerText = formatTime(totalArtlogSeconds);
             document.getElementById('total-logged-time').innerText = formatTime(totalSeconds);
             
-            const unloggedCodeTime = Math.max(0, totalHackatimeSeconds - totalCodeSeconds);
-            document.getElementById('total-time').innerText = formatTime(totalSeconds + unloggedCodeTime);
-            document.getElementById('hackatime-since-last-log').innerText = formatTime(unloggedCodeTime);
-
-            function timeProgressColor(value, max) {
-                // Green when < 50%, interpolate to red as approaching 100%, then red for anything over
-                if(value >= max) return 'rgb(200, 100, 100)';
-                if(value <= max * 0.5) return 'rgb(100, 200, 100)';
-                
-                const ratio = (value - max / 2) / (max / 2);
-                const r = ratio;
-                const g = 1 - ratio;
-                return `rgb(${r * 100 + 100}, ${g * 100 + 100}, 100)`;
+            // Record tracked time since the latest demo
+            trackedSecondsSinceLastDemo = 0;
+            for(const post of posts) {
+                if(post.postType === "devlog" && post.PlayLink) break;
+                trackedSecondsSinceLastDemo += post.HoursSpent * 60 * 60;
             }
+
+            // Get the hackatime time until the latest devlog
+            const latestDevlog = posts.find(p => p.postType === "devlog");
+            if(latestDevlog) {
+                hackatimeSecondsUntilLatestLog = await getHackatimeTimeUntil(latestDevlog.createdAt) || 0;
+                console.log("Calculated hackatime until latest log:", hackatimeSecondsUntilLatestLog);
+            } else {
+                hackatimeSecondsUntilLatestLog = 0;
+            }
+
+            shibaUpdateTime = new Date();
+            updateDisplay();
+
+            document.getElementById('reloading-shiba').style.display = 'none';
+        }
+
+        function updateDisplay() {
+            const unloggedCodeTime = totalHackatimeSeconds - hackatimeSecondsUntilLatestLog;
+            const totalSinceLastDemo = trackedSecondsSinceLastDemo + unloggedCodeTime;
+
+            const maxDemo = 10 * 60 * 60;
+            
+            // Total time
+            document.getElementById('total-time').innerText = formatTime(totalHackatimeSeconds + unloggedCodeTime);
+
+            // Hackatime since last log
+            document.getElementById('hackatime-since-last-log').innerText = formatTime(unloggedCodeTime);
 
             const maxUnlogged = 4 * 60 * 60;
             const unloggedProgress = document.getElementById('progress-since-last-log');
@@ -515,34 +597,30 @@
             unloggedProgress.value = Math.min(unloggedCodeTime, maxUnlogged);
             unloggedProgress.style.setProperty('--color', timeProgressColor(unloggedCodeTime, maxUnlogged));
 
-            let secondsSinceLastDemo = 0;
-            for(const post of posts) {
-                if(post.postType === "devlog" && post.PlayLink) break;
-                secondsSinceLastDemo += post.HoursSpent * 60 * 60;
-            }
-
-            const totalSinceLastDemo = secondsSinceLastDemo + unloggedCodeTime;
-            document.getElementById('tracked-since-last-demo').innerText = formatTime(secondsSinceLastDemo);
+            // Since last demo + unlogged
             document.getElementById('since-last-demo').innerText = formatTime(totalSinceLastDemo);
-
-            const maxDemo = 10 * 60 * 60;
-            
-            const demoProgress = document.getElementById('progress-tracked-since-last-demo');
-            demoProgress.max = maxDemo;
-            demoProgress.value = Math.min(secondsSinceLastDemo, maxDemo);
-            demoProgress.style.setProperty('--color', timeProgressColor(secondsSinceLastDemo, maxDemo));
 
             const totalDemoProgress = document.getElementById('progress-since-last-demo');
             totalDemoProgress.max = maxDemo;
-            totalDemoProgress.value = Math.min(totalSinceLastDemo, maxDemo);
+            totalDemoProgress.value = Math.min(unloggedCodeTime, maxDemo);
             totalDemoProgress.style.setProperty('--color', timeProgressColor(totalSinceLastDemo, maxDemo));
-
+            
             const expectedTickets = Math.min(5, Math.floor((totalSinceLastDemo) / (2 * 60 * 60)));
             document.getElementById('expected-playtest-tickets').innerText = expectedTickets;
 
-            document.getElementById('reloading-shiba').style.display = 'none';
+            // Since last demo
+            document.getElementById('tracked-since-last-demo').innerText = formatTime(trackedSecondsSinceLastDemo);
+            
+            const demoProgress = document.getElementById('progress-tracked-since-last-demo');
+            demoProgress.max = maxDemo;
+            demoProgress.value = Math.min(trackedSecondsSinceLastDemo, maxDemo);
+            demoProgress.style.setProperty('--color', timeProgressColor(trackedSecondsSinceLastDemo, maxDemo));
 
-            // Send notifications as appropriate
+            // Last updated
+            document.getElementById('last-updated').innerText = `Last updated: hackatime ${hackatimeUpdateTime ? hackatimeUpdateTime.toLocaleTimeString() : 'never'}, shiba ${shibaUpdateTime ? shibaUpdateTime.toLocaleTimeString() : 'never'}`;
+        }
+
+        function sendNotifications() {
             if(notificationPermission === 'granted') {
                 if(unloggedCodeTime >= 3 * 60 * 60) {
                     console.log('Sending unlogged hackatime notification');
@@ -562,8 +640,8 @@
         }
 
         (async () => {
-            await updateHackatime();
             await updateShiba();
+            await updateHackatime();
 
             setInterval(() => {
                 updateHackatime();
@@ -571,6 +649,7 @@
 
             setInterval(() => {
                 updateShiba();
+                sendNotifications();
             }, 15 * 60 * 1000);
         })()
     </script>
