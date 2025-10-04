@@ -96,12 +96,20 @@
             left: 0;
             right: 0;
             background-color: transparent;
+
+            border-radius: 100px;
+            background-color: #333;
+            border: none;
         }
         .panel progress::-webkit-progress-bar {
             border-radius: 100px;
             background-color: #333;
         }
         .panel progress::-webkit-progress-value {
+            background-color: var(--color);
+            border-radius: 100px;
+        }
+        .panel progress::-moz-progress-bar { /* This can't be combined with the above because webkit doesn't like it?? */
             background-color: var(--color);
             border-radius: 100px;
         }
