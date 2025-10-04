@@ -580,7 +580,7 @@
         }
 
         function updateDisplay() {
-            const unloggedCodeTime = totalHackatimeSeconds - hackatimeSecondsUntilLatestLog;
+            const unloggedCodeTime = Math.max(0, totalHackatimeSeconds - hackatimeSecondsUntilLatestLog);
             const totalSinceLastDemo = trackedSecondsSinceLastDemo + unloggedCodeTime;
 
             const maxDemo = 10 * 60 * 60;
