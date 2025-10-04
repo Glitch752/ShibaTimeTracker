@@ -544,10 +544,10 @@
 
             // Send notifications as appropriate
             if(notificationPermission === 'granted') {
-                if(unloggedCodeTime >= 4 * 60 * 60) {
+                if(unloggedCodeTime >= 3 * 60 * 60) {
                     console.log('Sending unlogged hackatime notification');
                     new Notification('Shiba Time Tracker', {
-                        body: 'You have 4+ hours of unlogged hackatime! Consider making a devlog post.',
+                        body: 'You have 3+ hours of unlogged hackatime! Consider making a devlog post.',
                         icon: 'https://shiba.hackclub.com/favicon.ico'
                     });
                 }
