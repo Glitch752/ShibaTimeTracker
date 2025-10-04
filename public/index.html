@@ -388,6 +388,7 @@
         let hackatimeSecondsUntilLatestLog = 0;
         let trackedSecondsSinceLastDemo = 0;
         let totalHackatimeSeconds = 0;
+        let totalLoggedSeconds = 0;
 
         let hackatimeUpdateTime = null;
         let shibaUpdateTime = null;
@@ -503,7 +504,7 @@
             // Calculate total artlog time and total logged time
             let totalArtlogSeconds = 0;
             let totalCodeSeconds = 0;
-            let totalSeconds = 0;
+            totalLoggedSeconds = 0;
 
             for(const post of posts) {
                 const postEl = document.createElement('div');
@@ -528,7 +529,7 @@
                     timeSeconds = post.timeSpentOnAsset * 60 * 60; // hours to seconds
                     totalArtlogSeconds += timeSeconds;
                 }
-                totalSeconds += timeSeconds;
+                totalLoggedSeconds += timeSeconds;
 
                 postEl.appendChild(badgeEl);
 
@@ -555,8 +556,8 @@
 
             // Total artlog and logged time; only depends on shiba data so can be updated here
             document.getElementById('total-artlog-time').innerText = formatTime(totalArtlogSeconds);
-            document.getElementById('total-logged-time').innerText = formatTime(totalSeconds);
-            
+            document.getElementById('total-logged-time').innerText = formatTime(totalLoggedSeconds);
+
             // Record tracked time since the latest demo
             trackedSecondsSinceLastDemo = 0;
             for(const post of posts) {
@@ -586,7 +587,7 @@
             const maxDemo = 10 * 60 * 60;
             
             // Total time
-            document.getElementById('total-time').innerText = formatTime(totalHackatimeSeconds + unloggedCodeTime);
+            document.getElementById('total-time').innerText = formatTime(totalLoggedSeconds + unloggedCodeTime);
 
             // Hackatime since last log
             document.getElementById('hackatime-since-last-log').innerText = formatTime(unloggedCodeTime);
