@@ -739,8 +739,8 @@
             let i = 0;
             setInterval(() => {
                 updateHackatime();
-                if(i++ % 3 === 0) sendNotifications();
-            }, 5 * 60 * 1000);
+                if(i++ % 5 === 0) sendNotifications();
+            }, 3 * 60 * 1000);
 
             setInterval(() => {
                 updateShiba();
