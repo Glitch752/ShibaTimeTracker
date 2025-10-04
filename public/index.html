@@ -253,8 +253,8 @@
     </div>
 
     <script>
-        const cacheShibaDuration = 60 * 20;
-        const cacheHackatimeDuration = 60;
+        const cacheShibaDuration = 5 * 60; // 5 minutes
+        const cacheHackatimeDuration = 60; // 1 minute
 
         function loadStorageValue(key, promptText) {
             let value = localStorage.getItem(key);
@@ -266,7 +266,7 @@
         }
 
         const apiKey = loadStorageValue('apiKey', 'Please enter your hackatime API key:');
-        const shibaToken = loadStorageValue('shibaApiKey', 'Please enter your shiba token (found with `localStorage.getItem("token")`):');
+        const shibaToken = loadStorageValue('shibaApiKey', 'Please enter your shiba token (found with `localStorage.getItem("token")` on a Shiba page):');
 
         const projectName = loadStorageValue('hackatimeProjectName', 'Please enter your hackatime project name:');
         const shibaProjectName = loadStorageValue('shibaProjectName', 'Please enter your shiba project name:');
@@ -404,7 +404,7 @@
             }
             
             // omg thomasss why is this a post request and why does it return like 10mb of json
-            const res = await fetch(`http://localhost:3000/api/games`, {
+            const res = await fetch(`/api/games`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
