@@ -431,6 +431,8 @@
         let totalHackatimeSeconds = 0;
         let totalLoggedSeconds = 0;
 
+        let latestDevlogTime = null;
+
         let hackatimeUpdateTime = null;
         let shibaUpdateTime = null;
         
@@ -458,7 +460,10 @@
 
         async function updateHackatime() {
             const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration);
-            if(!data) return;
+            if(!data) {
+                document.getElementById('invalid-api-key').style.display = 'inline';
+                return;
+            }
 
             if(data.error) {
                 if(data.error === "User not found") {
@@ -477,6 +482,14 @@
             // Total hackatime time
             // This only depends on hackatime data so can be updated here
             document.getElementById('total-hackatime-time').innerText = formatTime(totalHackatimeSeconds);
+
+            // Get the hackatime time after the latest devlog
+            if(latestDevlogTime) {
+                hackatimeSecondsAfterLatestLog = await getHackatimeTimeBetween(latestDevlogTime, undefined) || 0;
+                console.log("Calculated hackatime after latest log:", hackatimeSecondsAfterLatestLog);
+            } else {
+                hackatimeSecondsAfterLatestLog = 0;
+            }
 
             hackatimeUpdateTime = new Date();
             updateDisplay();
@@ -645,14 +658,7 @@
 
             document.getElementById('log-still-updating').style.display = latestStillUpdating ? 'inline' : 'none';
 
-            // Get the hackatime time until the latest devlog
-            // const latestDevlog = posts.find(p => p.postType === "devlog");
-            if(latestDevlog) {
-                hackatimeSecondsAfterLatestLog = await getHackatimeTimeBetween(latestDevlog.createdAt, undefined) || 0;
-                console.log("Calculated hackatime after latest log:", hackatimeSecondsAfterLatestLog);
-            } else {
-                hackatimeSecondsAfterLatestLog = 0;
-            }
+            latestDevlogTime = latestDevlog ? new Date(latestDevlog.createdAt) : null;
 
             shibaUpdateTime = new Date();
             updateDisplay();
@@ -737,12 +743,12 @@
             await updateHackatime();
 
             let i = 0;
-            setInterval(() => {
-                updateHackatime();
+            setInterval(async () => {
+                await updateHackatime();
                 if(i++ % 5 === 0) sendNotifications();
             }, 3 * 60 * 1000);
 
-            setInterval(() => {
+            setInterval(async () => {
                 updateShiba();
             }, 30 * 60 * 1000);
         })()
