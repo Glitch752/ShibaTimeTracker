@@ -743,6 +743,7 @@
         (async () => {
             await updateShiba();
             await updateHackatime();
+            sendNotifications();
 
             let i = 0;
             setInterval(async () => {
