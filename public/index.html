@@ -719,7 +719,7 @@
                         icon: 'https://shiba.hackclub.com/favicon.ico'
                     });
                 }
-                if(totalSinceLastDemo >= 10 * 60 * 60) {
+                if(trackedSecondsSinceLastDemo + hackatimeSecondsAfterLatestLog >= 10 * 60 * 60) {
                     console.log('Sending since last demo notification');
                     new Notification('Shiba Time Tracker', {
                         body: 'You have tracked 10+ hours since your last demo! Consider making a demo.',
