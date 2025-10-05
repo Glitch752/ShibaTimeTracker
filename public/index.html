@@ -485,7 +485,7 @@
 
             // Get the hackatime time after the latest devlog
             if(latestDevlogTime) {
-                hackatimeSecondsAfterLatestLog = await getHackatimeTimeBetween(latestDevlogTime, undefined) || 0;
+                hackatimeSecondsAfterLatestLog = await getHackatimeTimeBetween(latestDevlogTime.toISOString(), undefined) || 0;
                 console.log("Calculated hackatime after latest log:", hackatimeSecondsAfterLatestLog);
             } else {
                 hackatimeSecondsAfterLatestLog = 0;
@@ -712,7 +712,7 @@
 
         function sendNotifications() {
             if(notificationPermission === 'granted') {
-                if(unloggedCodeTime >= 3 * 60 * 60) {
+                if(hackatimeSecondsAfterLatestLog >= 3 * 60 * 60) {
                     console.log('Sending unlogged hackatime notification');
                     new Notification('Shiba Time Tracker', {
                         body: 'You have 3+ hours of unlogged hackatime! Consider making a devlog.',
