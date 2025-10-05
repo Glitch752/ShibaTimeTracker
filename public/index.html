@@ -559,7 +559,6 @@
 
             // Calculate total artlog time and total logged time
             let totalArtlogSeconds = 0;
-            let totalCodeSeconds = 0;
             totalLoggedSeconds = 0;
 
             for(const post of posts) {
@@ -573,11 +572,9 @@
                 if(post.postType === "devlog" && post.PlayLink) {
                     badgeEl.classList.add('demo');
                     badgeEl.innerText = 'Demo';
-                    totalCodeSeconds += timeSeconds;
                 } else if(post.postType === "devlog") {
                     badgeEl.classList.add('devlog');
                     badgeEl.innerText = 'Devlog';
-                    totalCodeSeconds += timeSeconds;
                 } else if(post.postType === "artlog") {
                     badgeEl.classList.add('artlog');
                     badgeEl.innerText = 'Artlog';
@@ -623,7 +620,12 @@
             let firstWithNonzeroTime = null;
             for(const post of posts) {
                 if(post.postType === "devlog" && post.PlayLink) break;
-                trackedSecondsSinceLastDemo += post.HoursSpent * 60 * 60;
+                if(post.postType === "artlog") {
+                    trackedSecondsSinceLastDemo += post.timeSpentOnAsset * 60 * 60;
+                    continue;
+                } else {
+                    trackedSecondsSinceLastDemo += post.HoursSpent * 60 * 60;
+                }
 
                 if(post.HoursSpent > 0 && !firstWithNonzeroTime) firstWithNonzeroTime = post;
             }
