@@ -252,7 +252,7 @@
             <span class="title partial-time">Since last demo</span>
             <div class="value" id="tracked-since-last-demo">...</div>
             <progress id="progress-tracked-since-last-demo" value="0" max="100" style="width: 100%;"></progress>
-            <span class="extra warning" title="The latest log has 0 time, so shiba is still likely updating. Numbers are based on the time the log was posted." id="log-still-updating" style="display: none">estimate; latest log is still updating</span>
+            <span class="extra warning" title="The latest log has 0 time, so shiba is still likely updating. Numbers are based on the time the log was posted. Hackatime gives funky estimates for short time periods, so this is likely pretty inaccurate. The total time should be correct, however." id="log-still-updating" style="display: none">estimate; latest log is still updating</span>
         </div>
         <div class="panel">
             <span class="title">Since last demo + unlogged</span>
@@ -428,6 +428,7 @@
 
         let hackatimeSecondsAfterLatestLog = 0;
         let trackedSecondsSinceLastDemo = 0;
+        let estimatedTrackedSecondsAdded = 0;
         let totalHackatimeSeconds = 0;
         let totalLoggedSeconds = 0;
 
@@ -582,7 +583,7 @@
                     timeSeconds = post.timeSpentOnAsset * 60 * 60; // hours to seconds
                     totalArtlogSeconds += timeSeconds;
                 }
-                totalLoggedSeconds += timeSeconds;
+                totalLoggedSeconds += Math.min(timeSeconds, 4 * 60 * 60); // Cap at 4 hours per log
 
                 postEl.appendChild(badgeEl);
 
@@ -607,6 +608,11 @@
                     timeEl.classList.add('warning');
                     timeEl.dataset.warning = 'updating';
                 }
+                if(post.postType === "devlog" && post.HoursSpent > 4) {
+                    timeEl.classList.add('warning');
+                    timeEl.title = "Time over 4 hours isn't counted! make sure to log more frequently.";
+                }
+
                 postEl.appendChild(timeEl);
 
                 postsContainer.appendChild(postEl);
@@ -619,6 +625,8 @@
             trackedSecondsSinceLastDemo = 0;
             let firstWithNonzeroTime = null;
             for(const post of posts) {
+                if(post.HoursSpent > 0 && !firstWithNonzeroTime) firstWithNonzeroTime = post;
+                
                 if(post.postType === "devlog" && post.PlayLink) break;
                 if(post.postType === "artlog") {
                     trackedSecondsSinceLastDemo += post.timeSpentOnAsset * 60 * 60;
@@ -626,8 +634,6 @@
                 } else {
                     trackedSecondsSinceLastDemo += post.HoursSpent * 60 * 60;
                 }
-
-                if(post.HoursSpent > 0 && !firstWithNonzeroTime) firstWithNonzeroTime = post;
             }
 
             // Record tracked time since the latest demo
@@ -646,15 +652,17 @@
             }
 
             // Compensate for updating logs by querying hackatime
+            estimatedTrackedSecondsAdded = 0;
             if(firstWithNonzeroTime && firstWithNonzeroTime !== latestDevlog) {
                 const hackatimeSinceFirstNonzero = await getHackatimeTimeBetween(firstWithNonzeroTime.createdAt, latestDevlog.createdAt) || 0;
                 console.log("Adding hackatime since first nonzero log:", hackatimeSinceFirstNonzero);
-                trackedSecondsSinceLastDemo += hackatimeSinceFirstNonzero;
+                estimatedTrackedSecondsAdded += hackatimeSinceFirstNonzero
 
                 // Update the latest devlogs' time to show this estimate
                 const warnings = document.querySelectorAll(`.post .logged-time[data-warning="updating"]`);
                 warnings.forEach(warning => {
                     warning.innerText = formatTime(hackatimeSinceFirstNonzero / warnings.length) + ' estimated';
+                    warning.title = "Shiba is really weird and doesn't update the latest log's time immediately, so this is an estimate based on hackatime";
                 });
             }
 
@@ -699,12 +707,12 @@
             document.getElementById('expected-playtest-tickets').innerText = expectedTickets;
 
             // Since last demo
-            document.getElementById('tracked-since-last-demo').innerText = formatTime(trackedSecondsSinceLastDemo);
+            document.getElementById('tracked-since-last-demo').innerText = formatTime(trackedSecondsSinceLastDemo + estimatedTrackedSecondsAdded);
             
             const demoProgress = document.getElementById('progress-tracked-since-last-demo');
             demoProgress.max = maxDemo;
-            demoProgress.value = Math.min(trackedSecondsSinceLastDemo, maxDemo);
-            demoProgress.style.setProperty('--color', timeProgressColor(trackedSecondsSinceLastDemo, maxDemo));
+            demoProgress.value = Math.min(trackedSecondsSinceLastDemo + estimatedTrackedSecondsAdded, maxDemo);
+            demoProgress.style.setProperty('--color', timeProgressColor(trackedSecondsSinceLastDemo + estimatedTrackedSecondsAdded, maxDemo));
 
             // Last updated
             document.getElementById('last-updated').innerText = `Last updated: hackatime ${hackatimeUpdateTime ? hackatimeUpdateTime.toLocaleTimeString() : 'never'}, shiba ${shibaUpdateTime ? shibaUpdateTime.toLocaleTimeString() : 'never'}`;
