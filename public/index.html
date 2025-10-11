@@ -252,7 +252,7 @@
             <span class="title partial-time">Since last demo</span>
             <div class="value" id="tracked-since-last-demo">...</div>
             <progress id="progress-tracked-since-last-demo" value="0" max="100" style="width: 100%;"></progress>
-            <span class="extra warning" title="The latest log has 0 time, so shiba is still likely updating. Numbers are based on the time the log was posted. Hackatime gives funky estimates for short time periods, so this is likely pretty inaccurate. The total time should be correct, however." id="log-still-updating" style="display: none">estimate; latest log is still updating</span>
+            <span class="extra warning" title="The latest log has 0 time, so shiba is still likely updating. Numbers are based on the time the log was posted." id="log-still-updating" style="display: none">estimate; latest log is still updating</span>
         </div>
         <div class="panel">
             <span class="title">Since last demo + unlogged</span>
@@ -367,8 +367,8 @@
         };
 
         const apiBase = `https://hackatime.hackclub.com/api/v1/`;
-        async function sendHackatimeRequest(endpoint, cacheDuration = 0, params = {}) {
-            const cacheKey = `hackatime_cache_${endpoint}_${Object.keys(params).sort()}`; // Cache based on keys present, not values. Works for all our current uses
+        async function sendHackatimeRequest(endpoint, cacheDuration = 0, hackatimeCacheKey = "", params = {}) {
+            const cacheKey = `hackatime_cache_${hackatimeCacheKey}`;
             const now = Date.now();
 
             // Check cache
@@ -438,8 +438,8 @@
         let shibaUpdateTime = null;
         
         /** @param {string | undefined} start ISO 8601 date string */
-        async function getHackatimeTimeBetween(start, end = undefined) {
-            const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration, {
+        async function getHackatimeTimeBetween(start, end = undefined, cacheKey = `between_${start || 'start'}_${end || 'end'}`) {
+            const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration, cacheKey, {
                 start_date: start ?? undefined,
                 end_date: end ?? undefined
             });
@@ -460,7 +460,7 @@
         }
 
         async function updateHackatime() {
-            const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration);
+            const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration, `total_${projectName}`);
             if(!data) {
                 document.getElementById('invalid-api-key').style.display = 'inline';
                 return;
@@ -486,7 +486,7 @@
 
             // Get the hackatime time after the latest devlog
             if(latestDevlogTime) {
-                hackatimeSecondsAfterLatestLog = await getHackatimeTimeBetween(latestDevlogTime.toISOString(), undefined) || 0;
+                hackatimeSecondsAfterLatestLog = await getHackatimeTimeBetween(latestDevlogTime.toISOString(), undefined, "after_latest_log") || 0;
                 console.log("Calculated hackatime after latest log:", hackatimeSecondsAfterLatestLog);
             } else {
                 hackatimeSecondsAfterLatestLog = 0;
@@ -654,8 +654,8 @@
             // Compensate for updating logs by querying hackatime
             estimatedTrackedSecondsAdded = 0;
             if(firstWithNonzeroTime && firstWithNonzeroTime !== latestDevlog) {
-                const hackatimeSinceFirstNonzero = await getHackatimeTimeBetween(firstWithNonzeroTime.createdAt, latestDevlog.createdAt) || 0;
-                console.log("Adding hackatime since first nonzero log:", hackatimeSinceFirstNonzero);
+                const hackatimeSinceFirstNonzero = await getHackatimeTimeBetween(firstWithNonzeroTime.createdAt, latestDevlog.createdAt, "between_first_nonzero_and_latest") || 0;
+                console.log(`Adding hackatime since first nonzero log (before ${latestDevlog.createdAt}): `, hackatimeSinceFirstNonzero);
                 estimatedTrackedSecondsAdded += hackatimeSinceFirstNonzero
 
                 // Update the latest devlogs' time to show this estimate
@@ -679,7 +679,8 @@
 
         function updateDisplay() {
             const unloggedCodeTime = hackatimeSecondsAfterLatestLog;
-            const totalSinceLastDemo = trackedSecondsSinceLastDemo + unloggedCodeTime;
+            const estimatedSinceLastDemo = trackedSecondsSinceLastDemo + estimatedTrackedSecondsAdded;
+            const totalSinceLastDemo = estimatedSinceLastDemo + unloggedCodeTime;
 
             const maxDemo = 10 * 60 * 60;
             
@@ -700,19 +701,19 @@
 
             const totalDemoProgress = document.getElementById('progress-since-last-demo');
             totalDemoProgress.max = maxDemo;
-            totalDemoProgress.value = Math.min(trackedSecondsSinceLastDemo + unloggedCodeTime, maxDemo);
+            totalDemoProgress.value = Math.min(totalSinceLastDemo, maxDemo);
             totalDemoProgress.style.setProperty('--color', timeProgressColor(totalSinceLastDemo, maxDemo));
             
             const expectedTickets = Math.min(5, Math.floor((totalSinceLastDemo) / (2 * 60 * 60)));
             document.getElementById('expected-playtest-tickets').innerText = expectedTickets;
 
             // Since last demo
-            document.getElementById('tracked-since-last-demo').innerText = formatTime(trackedSecondsSinceLastDemo + estimatedTrackedSecondsAdded);
+            document.getElementById('tracked-since-last-demo').innerText = formatTime(estimatedSinceLastDemo);
             
             const demoProgress = document.getElementById('progress-tracked-since-last-demo');
             demoProgress.max = maxDemo;
-            demoProgress.value = Math.min(trackedSecondsSinceLastDemo + estimatedTrackedSecondsAdded, maxDemo);
-            demoProgress.style.setProperty('--color', timeProgressColor(trackedSecondsSinceLastDemo + estimatedTrackedSecondsAdded, maxDemo));
+            demoProgress.value = Math.min(estimatedSinceLastDemo, maxDemo);
+            demoProgress.style.setProperty('--color', timeProgressColor(estimatedSinceLastDemo, maxDemo));
 
             // Last updated
             document.getElementById('last-updated').innerText = `Last updated: hackatime ${hackatimeUpdateTime ? hackatimeUpdateTime.toLocaleTimeString() : 'never'}, shiba ${shibaUpdateTime ? shibaUpdateTime.toLocaleTimeString() : 'never'}`;
