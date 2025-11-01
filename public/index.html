@@ -439,6 +439,16 @@
         
         /** @param {string | undefined} start ISO 8601 date string */
         async function getHackatimeTimeBetween(start, end = undefined, cacheKey = `between_${start || 'start'}_${end || 'end'}`) {
+            // If the start and end time are less than 2 minutes (idk artitrary limit) apart, skip. Hackatime doesn't like when we ask for very short durations, it seems.
+            if(start && end) {
+                const startDate = new Date(start);
+                const endDate = new Date(end);
+                if(endDate.getTime() - startDate.getTime() < 2 * 60 * 1000) {
+                    console.log("Skipping hackatime query for short duration");
+                    return 0;
+                }
+            }
+
             const data = await sendHackatimeRequest(`users/my/project/${projectName}`, cacheHackatimeDuration, cacheKey, {
                 start_date: start ?? undefined,
                 end_date: end ?? undefined
